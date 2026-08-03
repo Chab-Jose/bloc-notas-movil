@@ -1,20 +1,20 @@
-
 import 'package:blog_note_android/models/check_list_note.dart';
 import 'package:blog_note_android/models/item_check.dart';
 import 'package:blog_note_android/models/note.dart';
 import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
+import 'package:blog_note_android/views/editor/painters/notebook_lines_painter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class EditorScreen extends StatefulWidget {
-   final Note? note;
-   final String type;        // ← agrega este parámetro
+  final Note? note;
+  final String type; // ← agrega este parámetro
 
   const EditorScreen({
     super.key,
     this.note,
-    this.type = 'text',     // por defecto texto
+    this.type = 'text', // por defecto texto
   });
 
   @override
@@ -24,9 +24,10 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+  final _newItemController = TextEditingController();
 
-  late String _type;                    // 'text' o 'checklist'
-  List<ItemCheck> _items = [];          // items del checklist
+  late String _type; // 'text' o 'checklist'
+  List<ItemCheck> _items = []; // items del checklist
   bool _isSaving = false;
 
   @override
@@ -56,6 +57,7 @@ class _EditorScreenState extends State<EditorScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _newItemController.dispose();
     super.dispose();
   }
 
@@ -110,8 +112,18 @@ class _EditorScreenState extends State<EditorScreen> {
   // ─────────────────────────────────────────
 
   void _addItem() {
+    final content = _newItemController.text.trim();
+
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El item no puede estar vacío')),
+      );
+      return;
+    }
+
     setState(() {
-      _items.add(ItemCheck(content: '', isDone: false));
+      _items.add(ItemCheck(content: content, isDone: false));
+      _newItemController.clear();
     });
   }
 
@@ -165,24 +177,29 @@ class _EditorScreenState extends State<EditorScreen> {
                 ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Campo título
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
-                labelText: 'Título',
-                border: OutlineInputBorder(),
+                hintText: 'Título',
+                border: InputBorder.none,
+                hintStyle: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
               ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            const SizedBox(height: 20),
+            const Divider(),
 
-            // Contenido según el tipo
+            // Contenido ocupa el resto
             if (_type == 'text') _buildTextContent(),
             if (_type == 'checklist') _buildChecklistContent(),
           ],
@@ -196,66 +213,139 @@ class _EditorScreenState extends State<EditorScreen> {
   // ─────────────────────────────────────────
 
   Widget _buildTextContent() {
-    return TextField(
-      controller: _contentController,
-      decoration: const InputDecoration(
-        labelText: 'Contenido',
-        border: OutlineInputBorder(),
-        alignLabelWithHint: true,
+    return Expanded(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const lineHeight = 28.0;
+          return Stack(
+            children: [
+              // Líneas de la libreta
+              CustomPaint(
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                painter: NotebookLinesPainter(
+                  // ← sin el guión bajo
+                  lineHeight: lineHeight,
+                  lineColor: Colors.indigo.withValues(alpha: 0.2),
+                ),
+              ),
+
+              SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                child: TextField(
+                  controller: _contentController,
+                  maxLines: null, // ← crece infinito
+                  expands: true, // ← ocupa todo el espacio disponible
+                  textCapitalization: TextCapitalization.sentences,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: lineHeight / 16, // ← alinea texto con las líneas
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none, // ← sin bordes
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.only(left: 8, top: 4),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      maxLines: 10,
-      textCapitalization: TextCapitalization.sentences,
     );
   }
 
   Widget _buildChecklistContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Items', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-
-        // Lista de items
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _items.length,
-          itemBuilder: (context, index) {
-            return Row(
-              children: [
-                // Checkbox
-                Checkbox(
-                  value: _items[index].isDone,
-                  onChanged: (value) => _toggleItem(index, value ?? false),
-                ),
-                // Campo de texto del item
-                Expanded(
-                  child: TextFormField(
-                    initialValue: _items[index].content,
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe un item...',
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (value) => _updateItemContent(index, value),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Input para agregar nuevo item ──
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _newItemController,
+                  decoration: const InputDecoration(
+                    hintText: 'Escribe un item...',
+                    border: InputBorder.none,
                   ),
+                  textCapitalization: TextCapitalization.sentences,
+                  onSubmitted: (_) => _addItem(), // agregar con teclado Enter
                 ),
-                // Botón eliminar item
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                  onPressed: () => _removeItem(index),
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Colors.indigo),
+                onPressed: _addItem,
+              ),
+            ],
+          ),
 
-        // Botón agregar item
-        TextButton.icon(
-          onPressed: _addItem,
-          icon: const Icon(Icons.add),
-          label: const Text('Agregar item'),
-        ),
-      ],
+          const Divider(),
+
+          // ── Lista de items ──
+          Expanded(
+            child: _items.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No hay items aún',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        // Palomita o círculo vacío
+                        leading: GestureDetector(
+                          onTap: () => _toggleItem(index, !item.isDone),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              item.isDone
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              key: ValueKey(item.isDone),
+                              color: item.isDone ? Colors.indigo : Colors.grey,
+                            ),
+                          ),
+                        ),
+                        // Texto con tachado y negrita si está hecho
+                        title: GestureDetector(
+                          onTap: () => _toggleItem(index, !item.isDone),
+                          child: Text(
+                            item.content,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: item.isDone
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              decoration: item.isDone
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              decorationThickness: 2,
+                              color: item.isDone ? Colors.grey : Colors.black,
+                            ),
+                          ),
+                        ),
+                        // Botón eliminar
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.redAccent,
+                          ),
+                          onPressed: () => _removeItem(index),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

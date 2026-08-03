@@ -13,7 +13,7 @@ class ItemCheck {
     return {
       'id': id,
       'content': content,
-      'isDone': isDone,
+      'isDone': isDone ?  1 : 0,
     };
   }
 
@@ -21,7 +21,7 @@ class ItemCheck {
     return ItemCheck(
       id: json['id'],
       content: json['content'],
-      isDone: json['isDone'] ?? false,
+      isDone: json['isDone'] == 1,
     );
   }
 }

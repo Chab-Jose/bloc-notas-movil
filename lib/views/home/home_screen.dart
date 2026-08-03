@@ -4,6 +4,7 @@ import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/editor_screen.dart';
 import 'package:blog_note_android/views/home/widgets/note_card.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -69,44 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showTypeDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('¿Qué tipo de nota?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.note),
-              title: const Text('Nota de texto'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EditorScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.checklist),
-              title: const Text('Checklist'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const EditorScreen(type: 'checklist'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<NoteViewModel>();
@@ -160,9 +123,38 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showTypeDialog(context),
-        child: const Icon(Icons.add),
+      floatingActionButton: SpeedDial(
+        icon: Icons.add,
+        activeIcon: Icons.close,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        spacing: 12,
+        children: [
+          SpeedDialChild(
+            child: const Icon(Icons.note, color: Colors.white),
+            label: 'Nota de texto',
+            backgroundColor: Colors.indigo,
+            labelBackgroundColor: Colors.indigo,
+            labelStyle: const TextStyle(color: Colors.white),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EditorScreen()),
+            ),
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.checklist, color: Colors.white),
+            label: 'Checklist',
+            backgroundColor: Colors.teal,
+            labelBackgroundColor: Colors.teal,
+            labelStyle: const TextStyle(color: Colors.white),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EditorScreen(type: 'checklist'),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

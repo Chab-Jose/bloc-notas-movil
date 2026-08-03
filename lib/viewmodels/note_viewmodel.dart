@@ -29,8 +29,10 @@ class NoteViewModel extends ChangeNotifier {
 
       notes = [...textNotes, ...checklists]
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } catch (e) {
+    } catch (e, stackTrace) {
       errorMessage = 'Error al cargar las notas';
+      print('❌ Error en loadAll: $e');         // ← muestra el error
+      print('📍 StackTrace: $stackTrace'); 
     } finally {
       isLoading = false;        // ← siempre se ejecuta
       notifyListeners();
