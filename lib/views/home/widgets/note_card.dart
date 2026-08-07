@@ -45,9 +45,17 @@ class NoteCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: onDelete,
+        // Agrega en el trailing del ListTile:
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (note.isFavorite)
+              const Icon(Icons.star, color: Colors.amber, size: 18),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: onDelete,
+            ),
+          ],
         ),
         isThreeLine: true,
       ),

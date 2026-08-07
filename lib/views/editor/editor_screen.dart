@@ -27,6 +27,7 @@ class _EditorScreenState extends State<EditorScreen> {
   final _contentController = TextEditingController();
   final _newItemController = TextEditingController();
   NoteCategory _category = NoteCategory.purple; // categoría por defecto
+  bool _isFavorite = false; // estado de favorito
 
   late String _type; // 'text' o 'checklist'
   List<ItemCheck> _items = []; // items del checklist
@@ -42,6 +43,7 @@ class _EditorScreenState extends State<EditorScreen> {
       // Modo edición — precarga los valores
       _titleController.text = note.title;
       _category = note.category;
+      _isFavorite = note.isFavorite;
       if (note is TextNote) {
         _type = 'text';
         _contentController.text = note.content;
@@ -89,7 +91,8 @@ class _EditorScreenState extends State<EditorScreen> {
         title: title,
         content: _contentController.text.trim(),
         createdAt: widget.note?.createdAt ?? DateTime.now(),
-        category: _category
+        category: _category,
+        isFavorite: _isFavorite,
       );
     } else {
       if (_items.isEmpty) {
@@ -104,7 +107,8 @@ class _EditorScreenState extends State<EditorScreen> {
         title: title,
         items: _items,
         createdAt: widget.note?.createdAt ?? DateTime.now(),
-        category: _category
+        category: _category,
+        isFavorite: _isFavorite,
       );
     }
 
@@ -169,6 +173,17 @@ class _EditorScreenState extends State<EditorScreen> {
         backgroundColor: _category.lightColor, // ← appbar mismo color
         title: Text(isEditing ? 'Editar nota' : 'Nueva nota'),
         actions: [
+          IconButton(
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                _isFavorite ? Icons.star : Icons.star_border,
+                key: ValueKey(_isFavorite),
+                color: _isFavorite ? Colors.amber : Colors.grey,
+              ),
+            ),
+            onPressed: () => setState(() => _isFavorite = !_isFavorite),
+          ),
           // ── Selector de categoría ──
           DropdownButtonHideUnderline(
             child: DropdownButton<NoteCategory>(
@@ -262,7 +277,9 @@ class _EditorScreenState extends State<EditorScreen> {
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 painter: NotebookLinesPainter(
                   lineHeight: lineHeight,
-                  lineColor: _category.color.withValues(alpha: 0.3), // ← usa color de categoría
+                  lineColor: _category.color.withValues(
+                    alpha: 0.3,
+                  ), // ← usa color de categoría
                 ),
               ),
               SizedBox(
@@ -381,5 +398,4 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
   }
-
 }

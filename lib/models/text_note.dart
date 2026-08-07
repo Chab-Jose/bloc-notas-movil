@@ -9,6 +9,7 @@ class TextNote extends Note {
     required super.title,
     required super.createdAt,
     super.category,
+    super.isFavorite,
     required this.content,
   });
 
@@ -18,6 +19,7 @@ class TextNote extends Note {
       title: json['title'],
       createdAt: DateTime.parse(json['created_at']),
       category: NoteCategory.fromString(json['category'] ?? 'purple'),
+      isFavorite: (json['is_favorite'] ?? 0) == 1,
       content: json['content']
     );
   }
@@ -31,6 +33,7 @@ class TextNote extends Note {
       'created_at': createdAt.toIso8601String(),
       'type': 'text',
       'category': category.name, // Para saber qué tipo es al leer de BD
+      'is_favorite': isFavorite ? 1 : 0
     };
   }
 

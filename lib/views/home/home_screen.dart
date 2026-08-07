@@ -21,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _filter = 'all'; // 'all', 'text', 'checklist'
   bool _ascending = false; // false = más reciente primero
   NoteCategory? _categoryFilter; // null = todas las categorías
+  bool _onlyFavorites = false; // false = mostrar todas, true = solo favoritos
 
   @override
   void initState() {
@@ -39,9 +40,14 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (_filter == 'checklist') {
       result = result.whereType<ChecklistNote>().toList();
     }
-  // Filtro por categoría ← nuevo
+    // Filtro por categoría ← nuevo
     if (_categoryFilter != null) {
       result = result.where((n) => n.category == _categoryFilter).toList();
+    }
+
+    // En _applyFilters agrega:
+    if (_onlyFavorites) {
+      result = result.where((n) => n.isFavorite).toList();
     }
 
     // Orden por fecha
@@ -86,59 +92,74 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Mis Notas'),
         actions: [
-          // ── Filtro por categoría ──
-         PopupMenuButton<String>(
-  icon: Icon(
-    Icons.circle,
-    color: _categoryFilter?.color ?? Colors.grey,
-  ),
-  tooltip: 'Filtrar por categoría',
-  onSelected: (value) => setState(() {
-    _categoryFilter = value == 'all'
-        ? null
-        : NoteCategory.values.firstWhere((c) => c.name == value);
-  }),
-  itemBuilder: (_) => [
-    // Opción "Todas"
-    PopupMenuItem<String>(
-      value: 'all',
-      child: Row(
-        children: [
-          const Icon(Icons.circle_outlined, color: Colors.grey, size: 16),
-          const SizedBox(width: 8),
-          const Text('Todas'),
-          if (_categoryFilter == null)
-            const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Icon(Icons.check, size: 16),
+          IconButton(
+            icon: Icon(
+              _onlyFavorites ? Icons.star : Icons.star_border,
+              color: _onlyFavorites ? Colors.amber : Colors.grey,
             ),
-        ],
-      ),
-    ),
-    // Una opción por cada categoría
-    ...NoteCategory.values.map(
-      (cat) => PopupMenuItem<String>(
-        value: cat.name,
-        child: Row(
-          children: [
-            Icon(Icons.circle, color: cat.color, size: 16),
-            const SizedBox(width: 8),
-            Text(cat.label),
-            if (_categoryFilter == cat)
-              const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(Icons.check, size: 16),
+            tooltip: _onlyFavorites ? 'Mostrar todas' : 'Solo favoritos',
+            onPressed: () => setState(() => _onlyFavorites = !_onlyFavorites),
+          ),
+          // ── Filtro por categoría ──
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.circle,
+              color: _categoryFilter?.color ?? Colors.grey,
+            ),
+            tooltip: 'Filtrar por categoría',
+            onSelected: (value) => setState(() {
+              _categoryFilter = value == 'all'
+                  ? null
+                  : NoteCategory.values.firstWhere((c) => c.name == value);
+            }),
+
+            itemBuilder: (_) => [
+              // Opción "Todas"
+              PopupMenuItem<String>(
+                value: 'all',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.circle_outlined,
+                      color: Colors.grey,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Todas'),
+                    if (_categoryFilter == null)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 8),
+                        child: Icon(Icons.check, size: 16),
+                      ),
+                  ],
+                ),
               ),
-          ],
-        ),
-      ),
-    ),
-  ],
-),
+              // Una opción por cada categoría
+              ...NoteCategory.values.map(
+                (cat) => PopupMenuItem<String>(
+                  value: cat.name,
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, color: cat.color, size: 16),
+                      const SizedBox(width: 8),
+                      Text(cat.label),
+                      if (_categoryFilter == cat)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.check, size: 16),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
           // ── Ordenar por fecha ──
           IconButton(
             icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
-            tooltip: _ascending ? 'Más antiguas primero' : 'Más recientes primero',
+            tooltip: _ascending
+                ? 'Más antiguas primero'
+                : 'Más recientes primero',
             onPressed: () => setState(() => _ascending = !_ascending),
           ),
 
