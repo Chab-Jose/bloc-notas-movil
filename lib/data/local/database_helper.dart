@@ -31,6 +31,7 @@ class DatabaseHelper {
         title      TEXT NOT NULL,
         content    TEXT,
         type       TEXT NOT NULL,
+        category   TEXT NOT NULL DEFAULT 'purple',
         created_at TEXT NOT NULL
       )
     ''');

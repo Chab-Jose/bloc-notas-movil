@@ -1,6 +1,7 @@
 import 'package:blog_note_android/models/check_list_note.dart';
 import 'package:blog_note_android/models/item_check.dart';
 import 'package:blog_note_android/models/note.dart';
+import 'package:blog_note_android/models/note_category.dart';
 import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/painters/notebook_lines_painter.dart';
@@ -25,6 +26,7 @@ class _EditorScreenState extends State<EditorScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _newItemController = TextEditingController();
+  NoteCategory _category = NoteCategory.purple; // categoría por defecto
 
   late String _type; // 'text' o 'checklist'
   List<ItemCheck> _items = []; // items del checklist
@@ -39,6 +41,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (note != null) {
       // Modo edición — precarga los valores
       _titleController.text = note.title;
+      _category = note.category;
       if (note is TextNote) {
         _type = 'text';
         _contentController.text = note.content;
@@ -50,6 +53,7 @@ class _EditorScreenState extends State<EditorScreen> {
       }
     } else {
       _type = widget.type;
+      _category = NoteCategory.purple; // categoría por defecto
     }
   }
 
@@ -85,6 +89,7 @@ class _EditorScreenState extends State<EditorScreen> {
         title: title,
         content: _contentController.text.trim(),
         createdAt: widget.note?.createdAt ?? DateTime.now(),
+        category: _category
       );
     } else {
       if (_items.isEmpty) {
@@ -99,6 +104,7 @@ class _EditorScreenState extends State<EditorScreen> {
         title: title,
         items: _items,
         createdAt: widget.note?.createdAt ?? DateTime.now(),
+        category: _category
       );
     }
 
@@ -158,9 +164,42 @@ class _EditorScreenState extends State<EditorScreen> {
     final isEditing = widget.note != null;
 
     return Scaffold(
+      backgroundColor: _category.lightColor, // ← fondo dinámico
       appBar: AppBar(
+        backgroundColor: _category.lightColor, // ← appbar mismo color
         title: Text(isEditing ? 'Editar nota' : 'Nueva nota'),
         actions: [
+          // ── Selector de categoría ──
+          DropdownButtonHideUnderline(
+            child: DropdownButton<NoteCategory>(
+              value: _category,
+              icon: Icon(Icons.circle, color: _category.color, size: 28),
+              dropdownColor: _category.lightColor,
+              onChanged: (cat) {
+                if (cat != null) setState(() => _category = cat);
+              },
+              items: NoteCategory.values.map((cat) {
+                return DropdownMenuItem(
+                  value: cat,
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, color: cat.color, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        cat.label,
+                        style: TextStyle(
+                          color: cat.color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          // ── Botón guardar ──
           _isSaving
               ? const Padding(
                   padding: EdgeInsets.all(14),
@@ -177,11 +216,12 @@ class _EditorScreenState extends State<EditorScreen> {
                 ),
         ],
       ),
-      body: Padding(
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 300), // ← transición suave
+        color: _category.lightColor,
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Campo título
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -198,8 +238,8 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
 
             const Divider(),
+            const SizedBox(height: 12),
 
-            // Contenido ocupa el resto
             if (_type == 'text') _buildTextContent(),
             if (_type == 'checklist') _buildChecklistContent(),
           ],
@@ -207,7 +247,6 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
   }
-
   // ─────────────────────────────────────────
   // Widgets internos
   // ─────────────────────────────────────────
@@ -219,30 +258,24 @@ class _EditorScreenState extends State<EditorScreen> {
           const lineHeight = 28.0;
           return Stack(
             children: [
-              // Líneas de la libreta
               CustomPaint(
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 painter: NotebookLinesPainter(
-                  // ← sin el guión bajo
                   lineHeight: lineHeight,
-                  lineColor: Colors.indigo.withValues(alpha: 0.2),
+                  lineColor: _category.color.withValues(alpha: 0.3), // ← usa color de categoría
                 ),
               ),
-
               SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 child: TextField(
                   controller: _contentController,
-                  maxLines: null, // ← crece infinito
-                  expands: true, // ← ocupa todo el espacio disponible
+                  maxLines: null,
+                  expands: true,
                   textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: lineHeight / 16, // ← alinea texto con las líneas
-                  ),
+                  style: const TextStyle(fontSize: 16, height: lineHeight / 16),
                   decoration: const InputDecoration(
-                    border: InputBorder.none, // ← sin bordes
+                    border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     contentPadding: EdgeInsets.only(left: 8, top: 4),
@@ -348,4 +381,5 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
   }
+
 }

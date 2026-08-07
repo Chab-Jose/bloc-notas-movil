@@ -1,11 +1,13 @@
 import 'package:blog_note_android/models/check_list_note.dart';
 import 'package:blog_note_android/models/note.dart';
+import 'package:blog_note_android/models/note_category.dart';
 import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/editor_screen.dart';
 import 'package:blog_note_android/views/home/widgets/note_card.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter/material.dart';
+import 'package:blog_note_android/models/note_category.dart';
 import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _filter = 'all'; // 'all', 'text', 'checklist'
   bool _ascending = false; // false = más reciente primero
+  NoteCategory? _categoryFilter; // null = todas las categorías
 
   @override
   void initState() {
@@ -35,6 +38,10 @@ class _HomeScreenState extends State<HomeScreen> {
       result = result.whereType<TextNote>().toList();
     } else if (_filter == 'checklist') {
       result = result.whereType<ChecklistNote>().toList();
+    }
+  // Filtro por categoría ← nuevo
+    if (_categoryFilter != null) {
+      result = result.where((n) => n.category == _categoryFilter).toList();
     }
 
     // Orden por fecha
@@ -79,16 +86,63 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Mis Notas'),
         actions: [
-          // Botón ordenar por fecha
+          // ── Filtro por categoría ──
+         PopupMenuButton<String>(
+  icon: Icon(
+    Icons.circle,
+    color: _categoryFilter?.color ?? Colors.grey,
+  ),
+  tooltip: 'Filtrar por categoría',
+  onSelected: (value) => setState(() {
+    _categoryFilter = value == 'all'
+        ? null
+        : NoteCategory.values.firstWhere((c) => c.name == value);
+  }),
+  itemBuilder: (_) => [
+    // Opción "Todas"
+    PopupMenuItem<String>(
+      value: 'all',
+      child: Row(
+        children: [
+          const Icon(Icons.circle_outlined, color: Colors.grey, size: 16),
+          const SizedBox(width: 8),
+          const Text('Todas'),
+          if (_categoryFilter == null)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.check, size: 16),
+            ),
+        ],
+      ),
+    ),
+    // Una opción por cada categoría
+    ...NoteCategory.values.map(
+      (cat) => PopupMenuItem<String>(
+        value: cat.name,
+        child: Row(
+          children: [
+            Icon(Icons.circle, color: cat.color, size: 16),
+            const SizedBox(width: 8),
+            Text(cat.label),
+            if (_categoryFilter == cat)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(Icons.check, size: 16),
+              ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
+          // ── Ordenar por fecha ──
           IconButton(
             icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
-            tooltip: _ascending
-                ? 'Más antiguas primero'
-                : 'Más recientes primero',
+            tooltip: _ascending ? 'Más antiguas primero' : 'Más recientes primero',
             onPressed: () => setState(() => _ascending = !_ascending),
           ),
 
-          // Menú filtrar por tipo
+          // ── Filtro por tipo ──
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
             onSelected: (value) => setState(() => _filter = value),
@@ -100,7 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.errorMessage != null

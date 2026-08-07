@@ -1,5 +1,6 @@
 import 'package:blog_note_android/models/item_check.dart';
 import 'package:blog_note_android/models/note.dart';
+import 'package:blog_note_android/models/note_category.dart';
 
 class ChecklistNote extends Note {
   final List<ItemCheck> items;
@@ -8,6 +9,7 @@ class ChecklistNote extends Note {
     super.id,
     required super.title,
     required super.createdAt,
+    super.category,
     required this.items,
   });
 
@@ -16,6 +18,7 @@ class ChecklistNote extends Note {
       id: json['id'],
       title: json['title'],
       createdAt: DateTime.parse(json['created_at']),
+      category: NoteCategory.fromString(json['category'] ?? 'purple'),
       items: (json['items'] as List<dynamic>)
           .map((i) => ItemCheck.fromJson(i))
           .toList(),
@@ -30,6 +33,7 @@ class ChecklistNote extends Note {
       'items': items.map((i) => i.toJson()).toList(),
       'created_at': createdAt.toIso8601String(),
       'type': 'checklist',
+      'category': category.name, // Para saber qué tipo es al leer de BD
     };
   }
 

@@ -21,10 +21,14 @@ class NoteCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
+        tileColor: note.category.lightColor, // ← fondo suave
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12), // ← mismo radio que el Card
+        ),
         onTap: onTap,
         leading: Icon(
           note is TextNote ? Icons.note : Icons.checklist,
-          color: Theme.of(context).colorScheme.primary,
+          color: note.category.color,
         ),
         title: Text(
           note.title,

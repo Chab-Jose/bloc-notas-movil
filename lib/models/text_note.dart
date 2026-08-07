@@ -1,4 +1,5 @@
 import 'package:blog_note_android/models/note.dart';
+import 'package:blog_note_android/models/note_category.dart';
 
 class TextNote extends Note {
   final String content;
@@ -7,6 +8,7 @@ class TextNote extends Note {
     super.id,
     required super.title,
     required super.createdAt,
+    super.category,
     required this.content,
   });
 
@@ -15,6 +17,7 @@ class TextNote extends Note {
       id: json['id'],
       title: json['title'],
       createdAt: DateTime.parse(json['created_at']),
+      category: NoteCategory.fromString(json['category'] ?? 'purple'),
       content: json['content']
     );
   }
@@ -26,7 +29,8 @@ class TextNote extends Note {
       'title': title,
       'content': content,
       'created_at': createdAt.toIso8601String(),
-      'type': 'text', // Para saber qué tipo es al leer de BD
+      'type': 'text',
+      'category': category.name, // Para saber qué tipo es al leer de BD
     };
   }
 
