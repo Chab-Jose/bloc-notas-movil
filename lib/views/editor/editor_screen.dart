@@ -28,6 +28,8 @@ class _EditorScreenState extends State<EditorScreen> {
   final _newItemController = TextEditingController();
   NoteCategory _category = NoteCategory.purple; // categoría por defecto
   bool _isFavorite = false; // estado de favorito
+  int? _editingIndex; // índice del item que se está editando
+  final _editingController = TextEditingController(); // para editar item
 
   late String _type; // 'text' o 'checklist'
   List<ItemCheck> _items = []; // items del checklist
@@ -64,6 +66,7 @@ class _EditorScreenState extends State<EditorScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _newItemController.dispose();
+    _editingController.dispose();
     super.dispose();
   }
 
@@ -151,14 +154,36 @@ class _EditorScreenState extends State<EditorScreen> {
     });
   }
 
-  void _updateItemContent(int index, String value) {
-    _items[index] = ItemCheck(
-      id: _items[index].id,
-      content: value,
-      isDone: _items[index].isDone,
-    );
+  void _startEditing(int index) {
+    setState(() {
+      _editingIndex = index;
+      _editingController.text = _items[index].content; // ← precarga el texto actual
+      _editingController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _editingController.text.length), // ← cursor al final
+      );
+    });
   }
 
+  void _confirmEdit(int index) {
+    final newContent = _editingController.text.trim();
+
+    if (newContent.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El item no puede estar vacío')),
+      );
+      return;
+    }
+
+    setState(() {
+      _items[index] = ItemCheck(
+        id: _items[index].id,
+        content: newContent,
+        isDone: _items[index].isDone,
+      );
+      _editingIndex = null;
+      _editingController.clear();
+    });
+  }
   // ─────────────────────────────────────────
   // Build
   // ─────────────────────────────────────────
@@ -347,9 +372,12 @@ class _EditorScreenState extends State<EditorScreen> {
                     itemCount: _items.length,
                     itemBuilder: (context, index) {
                       final item = _items[index];
+                      final isEditing =
+                          _editingIndex ==
+                          index; // ← controla qué item está en edición
+
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
-                        // Palomita o círculo vacío
                         leading: GestureDetector(
                           onTap: () => _toggleItem(index, !item.isDone),
                           child: AnimatedSwitcher(
@@ -363,33 +391,63 @@ class _EditorScreenState extends State<EditorScreen> {
                             ),
                           ),
                         ),
-                        // Texto con tachado y negrita si está hecho
-                        title: GestureDetector(
-                          onTap: () => _toggleItem(index, !item.isDone),
-                          child: Text(
-                            item.content,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: item.isDone
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              decoration: item.isDone
-                                  ? TextDecoration.lineThrough
-                                  : TextDecoration.none,
-                              decorationThickness: 2,
-                              color: item.isDone ? Colors.grey : Colors.black,
-                            ),
-                          ),
-                        ),
-                        // Botón eliminar
-                        trailing: IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: Colors.redAccent,
-                          ),
-                          onPressed: () => _removeItem(index),
-                        ),
+                        title: isEditing
+                            // ── Modo edición ──
+                            ? TextField(
+                                autofocus: true,
+                                controller: _editingController,
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(
+                                      Icons.check,
+                                      color: Colors.indigo,
+                                    ),
+                                    onPressed: () => _confirmEdit(index),
+                                  ),
+                                ),
+                                onSubmitted: (_) => _confirmEdit(index),
+                              )
+                            // ── Modo normal ──
+                            : GestureDetector(
+                                onTap: () => _toggleItem(index, !item.isDone),
+                                onDoubleTap: () => {if (!item.isDone) _startEditing(index)},
+                                child: Text(
+                                  item.content,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: item.isDone
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    decoration: item.isDone
+                                        ? TextDecoration.lineThrough
+                                        : TextDecoration.none,
+                                    decorationThickness: 2,
+                                    color: item.isDone
+                                        ? Colors.grey
+                                        : Colors.black,
+                                  ),
+                                ),
+                              ),
+                        trailing: isEditing
+                            ? IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () => setState(
+                                  () => _editingIndex = null,
+                                ), // ← cancela edición
+                              )
+                            : IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () => _removeItem(index),
+                              ),
                       );
                     },
                   ),

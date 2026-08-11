@@ -22,6 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _ascending = false; // false = más reciente primero
   NoteCategory? _categoryFilter; // null = todas las categorías
   bool _onlyFavorites = false; // false = mostrar todas, true = solo favoritos
+  String _searchQuery = ''; // Para búsqueda de notas
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -43,6 +45,18 @@ class _HomeScreenState extends State<HomeScreen> {
     // Filtro por categoría ← nuevo
     if (_categoryFilter != null) {
       result = result.where((n) => n.category == _categoryFilter).toList();
+    }
+
+    // Filtro por búsqueda
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      result = result
+          .where(
+            (n) =>
+                n.title.toLowerCase().contains(query) ||
+                n.getPreview().toLowerCase().contains(query),
+          )
+          .toList();
     }
 
     // En _applyFilters agrega:
@@ -90,8 +104,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Notas'),
+        title: _showSearch
+            ? TextField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Buscar notas...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey),
+                ),
+                onChanged: (value) => setState(() => _searchQuery = value),
+              )
+            : const Text('Mis Notas'),
+        leading: _showSearch
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() {
+                  _showSearch = false;
+                  _searchQuery = '';
+                }),
+              )
+            : null,
         actions: [
+          // ── Botón buscar ──
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => setState(() => _showSearch = true),
+          ),
+
+          // ── Favoritos ──
           IconButton(
             icon: Icon(
               _onlyFavorites ? Icons.star : Icons.star_border,
@@ -100,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: _onlyFavorites ? 'Mostrar todas' : 'Solo favoritos',
             onPressed: () => setState(() => _onlyFavorites = !_onlyFavorites),
           ),
+
           // ── Filtro por categoría ──
           PopupMenuButton<String>(
             icon: Icon(
@@ -112,9 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? null
                   : NoteCategory.values.firstWhere((c) => c.name == value);
             }),
-
             itemBuilder: (_) => [
-              // Opción "Todas"
               PopupMenuItem<String>(
                 value: 'all',
                 child: Row(
@@ -134,7 +173,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              // Una opción por cada categoría
               ...NoteCategory.values.map(
                 (cat) => PopupMenuItem<String>(
                   value: cat.name,
@@ -154,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+
           // ── Ordenar por fecha ──
           IconButton(
             icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
