@@ -5,6 +5,7 @@ import 'package:blog_note_android/models/note_category.dart';
 import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/painters/notebook_lines_painter.dart';
+import 'package:blog_note_android/utils/snackbar_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -29,7 +30,11 @@ class _EditorScreenState extends State<EditorScreen> {
   NoteCategory _category = NoteCategory.purple; // categoría por defecto
   bool _isFavorite = false; // estado de favorito
   int? _editingIndex; // índice del item que se está editando
+  String? _editingError;
   final _editingController = TextEditingController(); // para editar item
+  final _formKey = GlobalKey<FormState>();
+  final _itemFormKey =
+      GlobalKey<FormState>(); // ← key solo para el input del item
 
   late String _type; // 'text' o 'checklist'
   List<ItemCheck> _items = []; // items del checklist
@@ -75,18 +80,18 @@ class _EditorScreenState extends State<EditorScreen> {
   // ─────────────────────────────────────────
 
   Future<void> _save() async {
-    final title = _titleController.text.trim();
+    if (!_formKey.currentState!.validate()) return;
 
-    if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El título no puede estar vacío')),
-      );
+    if (_type == 'checklist' && _items.isEmpty) {
+      showSnackBar(context, 'El checklist no puede estar vacío');
+      setState(() => _isSaving = false);
       return;
     }
 
     setState(() => _isSaving = true);
 
     final Note note;
+    final title = _titleController.text.trim();
 
     if (_type == 'text') {
       note = TextNote(
@@ -98,13 +103,6 @@ class _EditorScreenState extends State<EditorScreen> {
         isFavorite: _isFavorite,
       );
     } else {
-      if (_items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Agrega al menos un item')),
-        );
-        setState(() => _isSaving = false);
-        return;
-      }
       note = ChecklistNote(
         id: widget.note?.id,
         title: title,
@@ -125,18 +123,14 @@ class _EditorScreenState extends State<EditorScreen> {
   // ─────────────────────────────────────────
 
   void _addItem() {
-    final content = _newItemController.text.trim();
+    if (!_itemFormKey.currentState!.validate()) return; // ← valida el form
 
-    if (content.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El item no puede estar vacío')),
-      );
-      return;
-    }
+    final content = _newItemController.text.trim();
 
     setState(() {
       _items.add(ItemCheck(content: content, isDone: false));
       _newItemController.clear();
+      _itemFormKey.currentState!.reset(); // ← limpia el error si lo había
     });
   }
 
@@ -157,9 +151,13 @@ class _EditorScreenState extends State<EditorScreen> {
   void _startEditing(int index) {
     setState(() {
       _editingIndex = index;
-      _editingController.text = _items[index].content; // ← precarga el texto actual
+      _editingError = null;
+      _editingController.text =
+          _items[index].content; // ← precarga el texto actual
       _editingController.selection = TextSelection.fromPosition(
-        TextPosition(offset: _editingController.text.length), // ← cursor al final
+        TextPosition(
+          offset: _editingController.text.length,
+        ), // ← cursor al final
       );
     });
   }
@@ -168,9 +166,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final newContent = _editingController.text.trim();
 
     if (newContent.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El item no puede estar vacío')),
-      );
+      setState(() => _editingError = 'El item no puede estar vacío');
       return;
     }
 
@@ -181,6 +177,7 @@ class _EditorScreenState extends State<EditorScreen> {
         isDone: _items[index].isDone,
       );
       _editingIndex = null;
+      _editingError = null;
       _editingController.clear();
     });
   }
@@ -260,29 +257,45 @@ class _EditorScreenState extends State<EditorScreen> {
         duration: const Duration(milliseconds: 300), // ← transición suave
         color: _category.lightColor,
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                hintText: 'Título',
-                border: InputBorder.none,
-                hintStyle: TextStyle(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _titleController,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onTapOutside: (_){                    
+                  FocusScope.of(context).unfocus(); // ← quita el foco del teclado
+                },
+                decoration: const InputDecoration(
+                  hintText: 'Título',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey,
                 ),
+                textCapitalization: TextCapitalization.sentences,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El título no puede estar vacío';
+                  }
+                  return null;
+                },
               ),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textCapitalization: TextCapitalization.sentences,
-            ),
 
-            const Divider(),
-            const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 12),
 
-            if (_type == 'text') _buildTextContent(),
-            if (_type == 'checklist') _buildChecklistContent(),
-          ],
+              if (_type == 'text') _buildTextContent(),
+              if (_type == 'checklist') _buildChecklistContent(),
+            ],
+          ),
         ),
       ),
     );
@@ -332,128 +345,127 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Widget _buildChecklistContent() {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Input para agregar nuevo item ──
-          Row(
+  return Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Input para agregar nuevo item ──
+        Form(
+          key: _itemFormKey,
+          child: Row(
             children: [
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: _newItemController,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  onTapOutside: (_){
+                    _itemFormKey.currentState?.reset(); // ← limpia el error si se toca fuera
+                    FocusScope.of(context).unfocus(); // ← quita el foco del teclado
+                  },
                   decoration: const InputDecoration(
                     hintText: 'Escribe un item...',
                     border: InputBorder.none,
+                    errorStyle: TextStyle(fontSize: 12),
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _addItem(), // agregar con teclado Enter
+                  onFieldSubmitted: (_) => _addItem(),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El item no puede estar vacío';
+                    }
+                    return null;
+                  },
                 ),
               ),
-              IconButton(
+              IconButton(                                    // ← dentro del Row
                 icon: const Icon(Icons.add_circle, color: Colors.indigo),
                 onPressed: _addItem,
               ),
-            ],
-          ),
+            ],                                              // ← cierra children del Row
+          ),                                                // ← cierra Row
+        ),                                                  // ← cierra Form
 
-          const Divider(),
+        const Divider(),
 
-          // ── Lista de items ──
-          Expanded(
-            child: _items.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No hay items aún',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      final isEditing =
-                          _editingIndex ==
-                          index; // ← controla qué item está en edición
+        // ── Lista de items ──
+        Expanded(
+          child: _items.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No hay items aún',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _items.length,
+                  itemBuilder: (context, index) {
+                    final item = _items[index];
+                    final isEditing = _editingIndex == index;
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: GestureDetector(
-                          onTap: () => _toggleItem(index, !item.isDone),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              item.isDone
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              key: ValueKey(item.isDone),
-                              color: item.isDone ? Colors.indigo : Colors.grey,
-                            ),
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: GestureDetector(
+                        onTap: () => _toggleItem(index, !item.isDone),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            item.isDone
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            key: ValueKey(item.isDone),
+                            color: item.isDone ? Colors.indigo : Colors.grey,
                           ),
                         ),
-                        title: isEditing
-                            // ── Modo edición ──
-                            ? TextField(
-                                autofocus: true,
-                                controller: _editingController,
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(
-                                      Icons.check,
-                                      color: Colors.indigo,
-                                    ),
-                                    onPressed: () => _confirmEdit(index),
-                                  ),
-                                ),
-                                onSubmitted: (_) => _confirmEdit(index),
-                              )
-                            // ── Modo normal ──
-                            : GestureDetector(
-                                onTap: () => _toggleItem(index, !item.isDone),
-                                onDoubleTap: () => {if (!item.isDone) _startEditing(index)},
-                                child: Text(
-                                  item.content,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: item.isDone
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    decoration: item.isDone
-                                        ? TextDecoration.lineThrough
-                                        : TextDecoration.none,
-                                    decorationThickness: 2,
-                                    color: item.isDone
-                                        ? Colors.grey
-                                        : Colors.black,
-                                  ),
+                      ),
+                      title: isEditing
+                          ? TextField(
+                              autofocus: true,
+                              controller: _editingController,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                errorText: _editingError,
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.check, color: Colors.indigo),
+                                  onPressed: () => _confirmEdit(index),
                                 ),
                               ),
-                        trailing: isEditing
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.close,
-                                  size: 18,
-                                  color: Colors.grey,
+                              onSubmitted: (_) => _confirmEdit(index),
+                            )
+                          : GestureDetector(
+                              onTap: () => _toggleItem(index, !item.isDone),
+                              onDoubleTap: () {
+                                if (!item.isDone) _startEditing(index);
+                              },
+                              child: Text(
+                                item.content,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: item.isDone
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  decoration: item.isDone
+                                      ? TextDecoration.lineThrough
+                                      : TextDecoration.none,
+                                  decorationThickness: 2,
+                                  color: item.isDone ? Colors.grey : Colors.black,
                                 ),
-                                onPressed: () => setState(
-                                  () => _editingIndex = null,
-                                ), // ← cancela edición
-                              )
-                            : IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  size: 18,
-                                  color: Colors.redAccent,
-                                ),
-                                onPressed: () => _removeItem(index),
                               ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
+                            ),
+                      trailing: isEditing
+                          ? IconButton(
+                              icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                              onPressed: () => setState(() => _editingIndex = null),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                              onPressed: () => _removeItem(index),
+                            ),
+                    );
+                  },
+                ),
+        ),
+      ],                                                    // ← cierra children del Column
+    ),                                                      // ← cierra Column
+  );                                                        // ← cierra Expanded
+}
 }
