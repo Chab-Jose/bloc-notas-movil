@@ -5,9 +5,9 @@ import 'package:blog_note_android/models/text_note.dart';
 import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/editor_screen.dart';
 import 'package:blog_note_android/views/home/widgets/note_card.dart';
+import 'package:blog_note_android/views/settings/settings_screen.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter/material.dart';
-import 'package:blog_note_android/models/note_category.dart';
 import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -103,6 +103,82 @@ class _HomeScreenState extends State<HomeScreen> {
     final notes = _applyFilters(vm.notes);
 
     return Scaffold(
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // ── Header ──
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(Icons.book, color: Colors.white, size: 40),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Bloc de Notas',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${vm.notes.length} notas',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Navegación ──
+            ListTile(
+              leading: const Icon(Icons.notes),
+              title: const Text('Todas las notas'),
+              onTap: () {
+                setState(() {
+                  _filter = 'all';
+                  _categoryFilter = null;
+                  _onlyFavorites = false;
+                  _searchQuery = '';
+                  _showSearch = false;
+                });
+                Navigator.pop(context);
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.star, color: Colors.amber),
+              title: const Text('Favoritos'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _onlyFavorites = true);
+              },
+            ),
+
+            const Divider(),
+
+            // ── Ajustes ──
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Ajustes'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
       appBar: AppBar(
         title: _showSearch
             ? TextField(
@@ -123,24 +199,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   _searchQuery = '';
                 }),
               )
-            : null,
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu), // ← botón del Drawer
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         actions: [
           // ── Botón buscar ──
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => setState(() => _showSearch = true),
           ),
-
-          // ── Favoritos ──
-          IconButton(
-            icon: Icon(
-              _onlyFavorites ? Icons.star : Icons.star_border,
-              color: _onlyFavorites ? Colors.amber : Colors.grey,
-            ),
-            tooltip: _onlyFavorites ? 'Mostrar todas' : 'Solo favoritos',
-            onPressed: () => setState(() => _onlyFavorites = !_onlyFavorites),
-          ),
-
+          
           // ── Filtro por categoría ──
           PopupMenuButton<String>(
             icon: Icon(

@@ -17,11 +17,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'notes.db');
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _onCreate,
-    );
+    return await openDatabase(path, version: 1, onCreate: _onCreate);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -44,6 +40,13 @@ class DatabaseHelper {
         content  TEXT NOT NULL,
         isDone   INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (note_id) REFERENCES notes(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE preferences (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
       )
     ''');
   }
