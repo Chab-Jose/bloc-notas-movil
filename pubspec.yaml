@@ -16,6 +16,7 @@ dependencies:
   path: ^1.9.0            # ← movido aquí
   intl: ^0.19.0           # ← movido aquí
   flutter_speed_dial: ^7.0.0
+  share_plus: ^10.0.0
 
 dependency_overrides:      # ← fuera de dev_dependencies
   sqflite_android: ^2.3.3

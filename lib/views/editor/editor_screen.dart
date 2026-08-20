@@ -7,7 +7,10 @@ import 'package:blog_note_android/viewmodels/note_viewmodel.dart';
 import 'package:blog_note_android/views/editor/painters/notebook_lines_painter.dart';
 import 'package:blog_note_android/utils/snackbar_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class EditorScreen extends StatefulWidget {
   final Note? note;
@@ -119,6 +122,36 @@ class _EditorScreenState extends State<EditorScreen> {
     if (mounted) Navigator.pop(context);
   }
 
+  Future<void> _copyToClipboard() async {
+    final title = _titleController.text;
+    final body = _type == 'text' ? _contentController.text : _itemsToText();
+
+    await Clipboard.setData(ClipboardData(text: '$title\n\n$body'));
+    if (mounted) showSnackBar(context, 'Copiado al portapapeles');
+  }
+
+  Future<void> _shareNote() async {
+    final title = _titleController.text;
+    final body = _type == 'text' ? _contentController.text : _itemsToText();
+
+    await Share.share('$title\n\n$body', subject: title);
+  }
+
+  // ── Para checklist ──
+  String _itemsToText() {
+    return _items
+        .map((item) {
+          final check = item.isDone ? '✅' : '⬜';
+          return '$check ${item.content}';
+        })
+        .join('\n');
+  }
+
+  String _formatDate() {
+    final date = widget.note?.createdAt ?? DateTime.now();
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
   // ─────────────────────────────────────────
   // Items del checklist
   // ─────────────────────────────────────────
@@ -195,51 +228,112 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       backgroundColor: _category.lightColor, // ← fondo dinámico
       appBar: AppBar(
-        backgroundColor: _category.lightColor, // ← appbar mismo color
-        title: Text(isEditing ? 'Editar nota' : 'Nueva nota'),
-        actions: [
-          IconButton(
-            icon: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                _isFavorite ? Icons.star : Icons.star_border,
-                key: ValueKey(_isFavorite),
-                color: _isFavorite ? Colors.amber : Colors.grey,
-              ),
+        backgroundColor: _category.lightColor,
+        titleSpacing: 0, // ← elimina el espacio entre la flecha y el título
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isEditing ? 'Editar nota' : 'Nueva nota',
+              overflow: TextOverflow.ellipsis,
             ),
-            onPressed: () => setState(() => _isFavorite = !_isFavorite),
+            // ── Estrella de favorito ──
+            if (_isFavorite)
+              Padding(
+                padding: const EdgeInsets.only(left: 5),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    Icons.star,
+                    key: ValueKey(_isFavorite),
+                    color: Colors.amber,
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          // ── Compartir ──
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.share),
+            onSelected: (value) {
+              if (value == 'copy') _copyToClipboard();
+              if (value == 'share') _shareNote();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'copy',
+                child: Row(
+                  children: [
+                    Icon(Icons.copy, size: 18),
+                    SizedBox(width: 8),
+                    Text('Copiar'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'share',
+                child: Row(
+                  children: [
+                    Icon(Icons.share, size: 18),
+                    SizedBox(width: 8),
+                    Text('Compartir'),
+                  ],
+                ),
+              ),
+            ],
           ),
-          // ── Selector de categoría ──
-          DropdownButtonHideUnderline(
-            child: DropdownButton<NoteCategory>(
-              value: _category,
-              icon: Icon(Icons.circle, color: _category.color, size: 28),
-              dropdownColor: _category.lightColor,
-              onChanged: (cat) {
-                if (cat != null) setState(() => _category = cat);
-              },
-              items: NoteCategory.values.map((cat) {
-                return DropdownMenuItem(
-                  value: cat,
+
+          // ── Menú de opciones (favorito + categoría) ──
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'favorite') {
+                setState(() => _isFavorite = !_isFavorite);
+              }
+            },
+            itemBuilder: (_) => [
+              // Favorito
+              PopupMenuItem<String>(
+                value: 'favorite',
+                child: Row(
+                  children: [
+                    Icon(
+                      _isFavorite ? Icons.star : Icons.star_border,
+                      color: _isFavorite ? Colors.amber : Colors.grey,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_isFavorite ? 'Quitar favorito' : 'Marcar favorito'),
+                  ],
+                ),
+              ),
+              // Separador
+              const PopupMenuDivider(),
+              // Categorías
+              ...NoteCategory.values.map(
+                (cat) => PopupMenuItem<String>(
+                  value: 'cat_${cat.name}',
+                  onTap: () => setState(() => _category = cat),
                   child: Row(
                     children: [
                       Icon(Icons.circle, color: cat.color, size: 16),
                       const SizedBox(width: 8),
-                      Text(
-                        cat.label,
-                        style: TextStyle(
-                          color: cat.color,
-                          fontWeight: FontWeight.bold,
+                      Text(cat.label),
+                      if (_category == cat)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.check, size: 16),
                         ),
-                      ),
                     ],
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+            ],
           ),
 
-          // ── Botón guardar ──
+          // ── Guardar ──
           _isSaving
               ? const Padding(
                   padding: EdgeInsets.all(14),
@@ -257,50 +351,77 @@ class _EditorScreenState extends State<EditorScreen> {
         ],
       ),
       body: AnimatedContainer(
-        duration: const Duration(milliseconds: 300), // ← transición suave
+        duration: const Duration(milliseconds: 300),
         color: _category.lightColor,
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _titleController,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                onTapOutside: (_) {
-                  FocusScope.of(
-                    context,
-                  ).unfocus(); // ← quita el foco del teclado
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Título',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+        child: Column(
+          children: [
+            // ── Título ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _titleController,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  decoration: const InputDecoration(
+                    hintText: 'Título',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El título no puede estar vacío';
+                    }
+                    return null;
+                  },
                 ),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-                textCapitalization: TextCapitalization.sentences,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'El título no puede estar vacío';
-                  }
-                  return null;
-                },
               ),
+            ),
 
-              const Divider(),
-              const SizedBox(height: 12),
+            // ── Separador con fecha ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Divider(
+                      color: _category.color.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatDate(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _category.color.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Divider(
+                      color: _category.color.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-              if (_type == 'text') _buildTextContent(),
-              if (_type == 'checklist') _buildChecklistContent(),
-            ],
-          ),
+            const SizedBox(height: 8),
+
+            // ── Contenido ──
+            if (_type == 'text') _buildTextContent(),
+            if (_type == 'checklist') _buildChecklistContent(),
+          ],
         ),
       ),
     );
@@ -333,12 +454,28 @@ class _EditorScreenState extends State<EditorScreen> {
                   maxLines: null,
                   expands: true,
                   textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(fontSize: 16, height: lineHeight / 16),
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: lineHeight / 16,
+                    color: Colors.black87,
+                  ),
+                  cursorColor: _category.color,
+                  decoration: InputDecoration(
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.only(left: 8, top: 4),
+                    contentPadding: const EdgeInsets.fromLTRB(
+                      20,
+                      4,
+                      20,
+                      0,
+                    ), // ← más padding horizontal
+                    isDense: true,
+                    hintText: 'Escribe tu nota aquí...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey.withValues(alpha: 0.5),
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -354,48 +491,51 @@ class _EditorScreenState extends State<EditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Input para agregar nuevo item ──
-          Form(
-            key: _itemFormKey,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _newItemController,
-                    autovalidateMode: _showItemError
-                        ? AutovalidateMode
-                              .onUserInteraction // ← muestra error solo si intentó agregar
-                        : AutovalidateMode.disabled,
-                    onTapOutside: (_) {
-                      setState(() => _showItemError = false);
-                      FocusScope.of(
-                        context,
-                      ).unfocus(); // ← quita el foco del teclado
-                    },
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe un item...',
-                      border: InputBorder.none,
-                      errorStyle: TextStyle(fontSize: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+            child: Form(
+              key: _itemFormKey,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _newItemController,
+                      autovalidateMode: _showItemError
+                          ? AutovalidateMode
+                                .onUserInteraction // ← muestra error solo si intentó agregar
+                          : AutovalidateMode.disabled,
+                      onTapOutside: (_) {
+                        setState(() => _showItemError = false);
+                        FocusScope.of(
+                          context,
+                        ).unfocus(); // ← quita el foco del teclado
+                      },
+                      decoration: const InputDecoration(
+                        hintText: 'Escribe un item...',
+                        border: InputBorder.none,
+                        errorStyle: TextStyle(fontSize: 12),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      onFieldSubmitted: (_) => _addItem(),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'El item no puede estar vacío';
+                        }
+                        return null;
+                      },
                     ),
-                    textCapitalization: TextCapitalization.sentences,
-                    onFieldSubmitted: (_) => _addItem(),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'El item no puede estar vacío';
-                      }
-                      return null;
-                    },
                   ),
-                ),
-                IconButton(
-                  // ← dentro del Row
-                  icon: const Icon(Icons.add_circle, color: Colors.indigo),
-                  onPressed: _addItem,
-                ),
-              ], // ← cierra children del Row
-            ), // ← cierra Row
-          ), // ← cierra Form
+                  IconButton(
+                    // ← dentro del Row
+                    icon: const Icon(Icons.add_circle, color: Colors.indigo),
+                    onPressed: _addItem,
+                  ),
+                ], // ← cierra children del Row
+              ), // ← cierra Row
+            ), // ← cierra Form
+          ),
 
+          // ── Input para agregar nuevo item ──
           const Divider(),
 
           // ── Lista de items ──

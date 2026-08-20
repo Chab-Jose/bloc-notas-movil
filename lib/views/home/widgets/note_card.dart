@@ -37,7 +37,12 @@ class NoteCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(note.getPreview()),
+            Text(
+              note.getPreview(),
+              maxLines: 1,                        // ← solo una línea
+              overflow: TextOverflow.ellipsis,    // ← agrega ... si no cabe
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
             const SizedBox(height: 4),
             Text(
               DateFormat('dd MMM yyyy – HH:mm').format(note.createdAt),

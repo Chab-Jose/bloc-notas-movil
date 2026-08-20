@@ -20,7 +20,7 @@ class TextNote extends Note {
       createdAt: DateTime.parse(json['created_at']),
       category: NoteCategory.fromString(json['category'] ?? 'purple'),
       isFavorite: (json['is_favorite'] ?? 0) == 1,
-      content: json['content']
+      content: json['content'],
     );
   }
 
@@ -33,12 +33,19 @@ class TextNote extends Note {
       'created_at': createdAt.toIso8601String(),
       'type': 'text',
       'category': category.name, // Para saber qué tipo es al leer de BD
-      'is_favorite': isFavorite ? 1 : 0
+      'is_favorite': isFavorite ? 1 : 0,
     };
   }
 
   @override
-  String getPreview() => content.length > 60
-      ? '${content.substring(0, 60)}...'
-      : content;
+  // En models/text_note.dart
+  @override
+  String getPreview() {
+    final firstLine = content.split('\n').first.trim();
+    return firstLine.length > 60
+        ? '${firstLine.substring(0, 60)}...'
+        : firstLine.isEmpty
+        ? ''
+        : firstLine;
+  }
 }
